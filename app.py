@@ -69,7 +69,6 @@ def perform_qa_check(image_url, text, prompt):
 
 def generate_page_image(page_num, prompt, text, retries=1):
     for attempt in range(retries + 1):
-
         with st.spinner(f"Generating Art for Page {page_num} (Attempt {attempt + 1})..."):
             try:
                 response = client.images.generate(
@@ -78,24 +77,18 @@ def generate_page_image(page_num, prompt, text, retries=1):
                     size="1024x1024",
                     quality="auto",
                     n=1,
+                    # NO response_format parameter!
                 )
                 
-                # --- X-RAY VISION TRAP ---
-                st.error("🛑 X-RAY MODE: Here is the raw package OpenAI sent back:")
-                st.write(response.model_dump())
-                st.stop()
-                # -------------------------
-                
-                # Grab the standard URL
-                image_url = response.data[0].url
-                
-
+                # Extract the native Base64 data your model provides
+                raw_b64 = response.data[0].b64_json
+                image_uri = f"data:image/png;base64,{raw_b64}"
                 
                 st.info(f"Running QA Check on Page {page_num}...")
-                score, feedback = perform_qa_check(image_url, text, prompt)
+                score, feedback = perform_qa_check(image_uri, text, prompt)
                 
                 if score >= 7 or attempt == retries:
-                    st.session_state.book_pages[page_num]['image_url'] = image_url
+                    st.session_state.book_pages[page_num]['image_url'] = image_uri
                     st.session_state.book_pages[page_num]['qa_score'] = score
                     st.session_state.book_pages[page_num]['qa_feedback'] = feedback
                     return True
@@ -118,8 +111,10 @@ def create_storybook_pdf():
         if data['image_url']:
             pdf.add_page()
             
-            # Download the image from the URL
-            img_data = requests.get(data['image_url']).content
+            # --- DECODE BASE64 FOR PDF ---
+            raw_b64_string = data['image_url'].split(",")[1]
+            img_data = base64.b64decode(raw_b64_string)
+            
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
                 temp_file.write(img_data)
                 temp_path = temp_file.name
@@ -176,7 +171,10 @@ if st.session_state.book_pages:
             col1, col2 = st.columns([1, 1])
             with col1:
                 if data['image_url']:
-                    st.image(data['image_url'], use_container_width=True)
+                    # --- DECODE BASE64 FOR DASHBOARD ---
+                    raw_b64_string = data['image_url'].split(",")[1]
+                    image_bytes = base64.b64decode(raw_b64_string)
+                    st.image(image_bytes, use_container_width=True)
             with col2:
                 st.markdown(f"### Page {page_num}")
                 st.markdown(f"**Text:** {data['text']}")
