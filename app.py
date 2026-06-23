@@ -136,13 +136,14 @@ raw_story = st.text_area("Paste your fully formatted story here (Page X / Text: 
 if st.button("🚀 Generate Entire Book"):
     st.session_state.book_pages = parse_story_input(raw_story)
     for page_num, data in st.session_state.book_pages.items():
-        generate_page_image(page_num, data['prompt'], data['text'])
-
-        image_result = generate_page_image(page_num, page_data['prompt'])
+        
+        # We assign the result directly using the correct 'data' variable
+        image_result = generate_page_image(page_num, data['prompt'], data['text'])
         
         if image_result is None or image_result == False:
             st.error(f"🛑 Generation halted due to an error on Page {page_num}. Fix the error below before continuing.")
-            st.stop()  # This instantly freezes the app right here so it doesn't keep running pages
+            st.stop()  # Instantly freezes the app to save your API budget
+            
     st.rerun()
 
 # Dashboard & Export
