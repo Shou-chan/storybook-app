@@ -35,6 +35,10 @@ def parse_story_input(raw_text):
     return pages
 
 def perform_qa_check(image_url, text, prompt):
+    # SAFETY CHECK: If no image was generated, skip the API call completely
+    if not image_url:
+        return 0, "Skipped QA: No image was generated due to a previous error."
+
     qa_system_prompt = f"""
     You are a strict Children's Book Art Director. 
     Review the image against this story text: "{text}" and prompt: "{prompt}"
@@ -59,7 +63,8 @@ def perform_qa_check(image_url, text, prompt):
         result = json.loads(response.choices[0].message.content)
         return result.get("score", 0), result.get("feedback", "QA Failed.")
     except Exception as e:
-        return 5, f"QA Error: {str(e)}"
+        # Changed default score to 0 so the app circuit-breaker knows to halt execution
+        return 0, f"QA Error: {str(e)}"
 
 def generate_page_image(page_num, prompt, text, retries=1):
     for attempt in range(retries + 1):
@@ -84,9 +89,9 @@ def generate_page_image(page_num, prompt, text, retries=1):
                 else:
                     st.warning(f"Page {page_num} failed QA (Score: {score}). Retrying...")
             except Exception as e:
-                # This saves the error permanently to the dashboard
+                # Save the error to the session state so you can see it
                 st.session_state.book_pages[page_num]['qa_feedback'] = f"SYSTEM ERROR: {str(e)}"
-                return False
+                return None  # Return None so the app knows generation failed
 
 def create_storybook_pdf():
     # 210x373mm creates a perfect 9:16 smartphone aspect ratio
@@ -132,6 +137,12 @@ if st.button("🚀 Generate Entire Book"):
     st.session_state.book_pages = parse_story_input(raw_story)
     for page_num, data in st.session_state.book_pages.items():
         generate_page_image(page_num, data['prompt'], data['text'])
+        # Inside your generation loop:
+        image_result = generate_page_image(page_num, prompt_text)
+        
+        if image_result is None or image_result == False:
+            st.error(f"🛑 Generation halted due to an error on Page {page_num}. Fix the error below before continuing.")
+            st.stop()  # This instantly freezes the app right here so it doesn't keep running pages
     st.rerun()
 
 # Dashboard & Export
