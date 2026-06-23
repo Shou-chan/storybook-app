@@ -69,6 +69,7 @@ def perform_qa_check(image_url, text, prompt):
 
 def generate_page_image(page_num, prompt, text, retries=1):
     for attempt in range(retries + 1):
+
         with st.spinner(f"Generating Art for Page {page_num} (Attempt {attempt + 1})..."):
             try:
                 response = client.images.generate(
@@ -76,11 +77,19 @@ def generate_page_image(page_num, prompt, text, retries=1):
                     prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
                     size="1024x1024",
                     quality="auto",
-                    n=1, # Notice we removed response_format entirely
+                    n=1,
                 )
+                
+                # --- X-RAY VISION TRAP ---
+                st.error("🛑 X-RAY MODE: Here is the raw package OpenAI sent back:")
+                st.write(response.model_dump())
+                st.stop()
+                # -------------------------
                 
                 # Grab the standard URL
                 image_url = response.data[0].url
+                
+
                 
                 st.info(f"Running QA Check on Page {page_num}...")
                 score, feedback = perform_qa_check(image_url, text, prompt)
