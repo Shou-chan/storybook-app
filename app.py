@@ -76,19 +76,17 @@ def generate_page_image(page_num, prompt, text, retries=1):
                     prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
                     size="1024x1024",
                     quality="auto",
-                    response_format="b64_json", # <-- Force raw data instead of URL
-                    n=1,
+                    n=1, # Notice we removed response_format entirely
                 )
                 
-                # Extract the raw data and build a readable Data URI
-                raw_b64 = response.data[0].b64_json
-                image_uri = f"data:image/png;base64,{raw_b64}"
+                # Grab the standard URL
+                image_url = response.data[0].url
                 
                 st.info(f"Running QA Check on Page {page_num}...")
-                score, feedback = perform_qa_check(image_uri, text, prompt)
+                score, feedback = perform_qa_check(image_url, text, prompt)
                 
                 if score >= 7 or attempt == retries:
-                    st.session_state.book_pages[page_num]['image_url'] = image_uri
+                    st.session_state.book_pages[page_num]['image_url'] = image_url
                     st.session_state.book_pages[page_num]['qa_score'] = score
                     st.session_state.book_pages[page_num]['qa_feedback'] = feedback
                     return True
@@ -111,19 +109,15 @@ def create_storybook_pdf():
         if data['image_url']:
             pdf.add_page()
             
-            # --- NEW BASE64 DECODE LOGIC ---
-            raw_b64_string = data['image_url'].split(",")[1]
-            img_data = base64.b64decode(raw_b64_string)
-            
+            # Download the image from the URL
+            img_data = requests.get(data['image_url']).content
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
                 temp_file.write(img_data)
                 temp_path = temp_file.name
             
-            # Draw the image
             pdf.image(temp_path, x=x_offset, y=0, w=img_size, h=img_size)
             os.remove(temp_path)
             
-            # Place the text beautifully in the bottom 30%
             pdf.set_xy(10, 275) 
             pdf.set_font("Helvetica", size=22) 
             clean_text = data['text'].encode('latin-1', 'replace').decode('latin-1')
@@ -156,14 +150,13 @@ if st.session_state.book_pages:
     st.markdown("---")
     st.subheader("2. Review and Export")
     
-    # PDF Generator Button
     ready_pages = sum(1 for p in st.session_state.book_pages.values() if p['image_url'])
     if ready_pages > 0:
         pdf_bytes = create_storybook_pdf()
         st.download_button(
-            label="📥 Download Storybook PDF (Mobile Format)",
+            label="📥 Download Storybook PDF",
             data=pdf_bytes,
-            file_name="Princess_Amara_Storybook.pdf",
+            file_name="Storybook.pdf",
             mime="application/pdf",
             type="primary"
         )
@@ -174,10 +167,7 @@ if st.session_state.book_pages:
             col1, col2 = st.columns([1, 1])
             with col1:
                 if data['image_url']:
-                    # --- NEW BASE64 DECODE LOGIC ---
-                    raw_b64_string = data['image_url'].split(",")[1]
-                    image_bytes = base64.b64decode(raw_b64_string)
-                    st.image(image_bytes, use_container_width=True)
+                    st.image(data['image_url'], use_container_width=True)
             with col2:
                 st.markdown(f"### Page {page_num}")
                 st.markdown(f"**Text:** {data['text']}")
