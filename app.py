@@ -84,7 +84,8 @@ def generate_page_image(page_num, prompt, text, retries=1):
                 else:
                     st.warning(f"Page {page_num} failed QA (Score: {score}). Retrying...")
             except Exception as e:
-                st.error(f"Error on Page {page_num}: {str(e)}")
+                # This saves the error permanently to the dashboard
+                st.session_state.book_pages[page_num]['qa_feedback'] = f"SYSTEM ERROR: {str(e)}"
                 return False
 
 def create_storybook_pdf():
