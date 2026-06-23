@@ -139,11 +139,14 @@ if st.button("🚀 Generate Entire Book"):
     st.session_state.book_pages = parse_story_input(raw_story)
     for page_num, data in st.session_state.book_pages.items():
         
-        # ONE single call to generate the image using the exact 'data' variables
         image_result = generate_page_image(page_num, data['prompt'], data['text'])
         
         if image_result is None or image_result == False:
-            st.error(f"🛑 Generation halted due to an error on Page {page_num}. Fix the error below before continuing.")
+            # Grab the hidden error message we saved in memory
+            exact_error = st.session_state.book_pages[page_num].get('qa_feedback', 'Unknown Error')
+            
+            # Print the exact error right on the screen before stopping
+            st.error(f"🛑 Generation halted on Page {page_num}.\n\n**Exact Error:** {exact_error}")
             st.stop()
             
     st.rerun()
