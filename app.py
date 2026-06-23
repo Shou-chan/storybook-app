@@ -89,7 +89,7 @@ def generate_page_image(page_num, prompt, text, retries=1):
             try:
                 response = client.images.generate(
                     model="gpt-image-2",
-                    prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
+                    prompt=prompt + " 1990s classic 2D animated feature film style, nostalgic fairy tale cel-shading, vibrant flat colors. The main characters are young children. Keep character designs highly consistent.",
                     size="1024x1024",
                     quality="auto",
                     n=1,
@@ -151,18 +151,38 @@ raw_story = st.text_area("Paste your fully formatted story here (Page X / Text: 
 
 if st.button("🚀 Generate Entire Book"):
     st.session_state.book_pages = parse_story_input(raw_story)
+    
+    # Create a dedicated space on the screen for live updates
+    st.markdown("### 🎨 Live Studio Preview")
+    preview_container = st.container()
+    
     for page_num, data in st.session_state.book_pages.items():
         
+        # 1. Generate the image
         image_result = generate_page_image(page_num, data['prompt'], data['text'])
         
         if image_result is None or image_result == False:
-            # Grab the hidden error message we saved in memory
             exact_error = st.session_state.book_pages[page_num].get('qa_feedback', 'Unknown Error')
-            
-            # Print the exact error right on the screen before stopping
             st.error(f"🛑 Generation halted on Page {page_num}.\n\n**Exact Error:** {exact_error}")
             st.stop()
             
+        # 2. --- NEW: LIVE PREVIEW DECODER ---
+        # As soon as the page succeeds, decode it and draw it on the screen immediately!
+        with preview_container:
+            # Decode the base64 string
+            raw_b64_string = st.session_state.book_pages[page_num]['image_url'].split(",")[1]
+            image_bytes = base64.b64decode(raw_b64_string)
+            
+            # Display it beautifully in two columns
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.image(image_bytes, use_container_width=True)
+            with col2:
+                st.success(f"**Page {page_num} Complete!**")
+                st.markdown(f"*{data['text']}*")
+            st.markdown("---")
+            
+    # Once the loop finishes all pages, refresh the app to load the final dashboard
     st.rerun()
 
 # Dashboard & Export
