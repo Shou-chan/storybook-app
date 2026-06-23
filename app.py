@@ -66,7 +66,7 @@ def generate_page_image(page_num, prompt, text, retries=1):
         with st.spinner(f"Generating Art for Page {page_num} (Attempt {attempt + 1})..."):
             try:
                 response = client.images.generate(
-                    model="dall-e-3",
+                    model="gpt-image-2",
                     prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
                     size="1024x1024",
                     quality="standard",
