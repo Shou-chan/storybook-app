@@ -5,10 +5,26 @@ import tempfile
 import os
 import re
 import json
-import base64  # <-- Add this!
+import base64
 from fpdf import FPDF
 
-# Set up the page layout
+# --- PASSWORD PROTECTION ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.title("🔒 Protected Storybook Builder")
+    pwd = st.text_input("Enter Access Password", type="password")
+    if st.button("Unlock App"):
+        if pwd == st.secrets["APP_PASSWORD"]:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Incorrect Password! Access Denied.")
+    st.stop()  # This entirely hides the rest of your app until unlocked
+# ---------------------------
+
+# Set up the page layout (The rest of your code continues down here...)
 st.set_page_config(page_title="AI Storybook Builder", layout="wide")
 st.title("📖 Autonomous Storybook Builder")
 
