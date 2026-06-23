@@ -69,7 +69,7 @@ def generate_page_image(page_num, prompt, text, retries=1):
                     model="gpt-image-2",
                     prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
                     size="1024x1024",
-                    quality="standard",
+                    quality="auto",
                     n=1,
                 )
                 image_url = response.data[0].url
