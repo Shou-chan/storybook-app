@@ -5,6 +5,7 @@ import tempfile
 import os
 import re
 import json
+import base64  # <-- Add this!
 from fpdf import FPDF
 
 # Set up the page layout
@@ -75,32 +76,33 @@ def generate_page_image(page_num, prompt, text, retries=1):
                     prompt=prompt + " Soft children's book watercolor style. Keep characters highly consistent.",
                     size="1024x1024",
                     quality="auto",
+                    response_format="b64_json", # <-- Force raw data instead of URL
                     n=1,
                 )
-                image_url = response.data[0].url
+                
+                # Extract the raw data and build a readable Data URI
+                raw_b64 = response.data[0].b64_json
+                image_uri = f"data:image/png;base64,{raw_b64}"
+                
                 st.info(f"Running QA Check on Page {page_num}...")
-                score, feedback = perform_qa_check(image_url, text, prompt)
+                score, feedback = perform_qa_check(image_uri, text, prompt)
                 
                 if score >= 7 or attempt == retries:
-                    st.session_state.book_pages[page_num]['image_url'] = image_url
+                    st.session_state.book_pages[page_num]['image_url'] = image_uri
                     st.session_state.book_pages[page_num]['qa_score'] = score
                     st.session_state.book_pages[page_num]['qa_feedback'] = feedback
                     return True
                 else:
                     st.warning(f"Page {page_num} failed QA (Score: {score}). Retrying...")
             except Exception as e:
-                # Save the error to the session state so you can see it
                 st.session_state.book_pages[page_num]['qa_feedback'] = f"SYSTEM ERROR: {str(e)}"
-                return None  # Return None so the app knows generation failed
+                return None
 
 def create_storybook_pdf():
     # 210x373mm creates a perfect 9:16 smartphone aspect ratio
     pdf = FPDF(orientation="P", unit="mm", format=(210, 373))
     pdf.set_auto_page_break(auto=False)
     
-    # 70% of the 373mm height is roughly 261mm.
-    # To fill a 210x261 space with a square image, we scale the square to 261x261
-    # and shift it left by 25.5mm to perfectly center the most important part of the art.
     img_size = 261
     x_offset = -(img_size - 210) / 2
     
@@ -109,21 +111,21 @@ def create_storybook_pdf():
         if data['image_url']:
             pdf.add_page()
             
-            # 1. Download and place the image
-            img_data = requests.get(data['image_url']).content
+            # --- NEW BASE64 DECODE LOGIC ---
+            raw_b64_string = data['image_url'].split(",")[1]
+            img_data = base64.b64decode(raw_b64_string)
+            
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
                 temp_file.write(img_data)
                 temp_path = temp_file.name
             
-            # Draw the image with the new 70% sizing
+            # Draw the image
             pdf.image(temp_path, x=x_offset, y=0, w=img_size, h=img_size)
             os.remove(temp_path)
             
-            # 2. Place the text beautifully in the bottom 30%
-            pdf.set_xy(10, 275) # Shifted down below the larger image
-            pdf.set_font("Helvetica", size=22) # Adjusted font size to fit elegantly
-            
-            # Ensure text is clean of weird unicode characters that break basic PDFs
+            # Place the text beautifully in the bottom 30%
+            pdf.set_xy(10, 275) 
+            pdf.set_font("Helvetica", size=22) 
             clean_text = data['text'].encode('latin-1', 'replace').decode('latin-1')
             pdf.multi_cell(190, 10, txt=clean_text, align="C")
             
@@ -169,7 +171,10 @@ if st.session_state.book_pages:
             col1, col2 = st.columns([1, 1])
             with col1:
                 if data['image_url']:
-                    st.image(data['image_url'], use_container_width=True)
+                    # --- NEW BASE64 DECODE LOGIC ---
+                    raw_b64_string = data['image_url'].split(",")[1]
+                    image_bytes = base64.b64decode(raw_b64_string)
+                    st.image(image_bytes, use_container_width=True)
             with col2:
                 st.markdown(f"### Page {page_num}")
                 st.markdown(f"**Text:** {data['text']}")
@@ -179,4 +184,4 @@ if st.session_state.book_pages:
                 if st.button(f"🔄 Regenerate Page {page_num}", key=f"regen_{page_num}"):
                     generate_page_image(page_num, data['prompt'], data['text'])
                     st.rerun()
-            st.markdown("---")
+        st.markdown("---")
